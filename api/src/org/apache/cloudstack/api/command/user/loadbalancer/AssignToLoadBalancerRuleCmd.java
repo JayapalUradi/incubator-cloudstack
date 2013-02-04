@@ -36,6 +36,7 @@ import com.cloud.network.rules.LoadBalancer;
 import com.cloud.user.Account;
 import com.cloud.user.UserContext;
 import com.cloud.utils.StringUtils;
+import com.cloud.utils.net.NetUtils;
 
 @APICommand(name = "assignToLoadBalancerRule", description="Assigns virtual machine or a list of virtual machines to a load balancer rule.", responseObject=SuccessResponse.class)
 public class AssignToLoadBalancerRuleCmd extends BaseAsyncCmd {
@@ -55,6 +56,10 @@ public class AssignToLoadBalancerRuleCmd extends BaseAsyncCmd {
             required=true, description="the list of IDs of the virtual machine that are being assigned to the load balancer rule(i.e. virtualMachineIds=1,2,3)")
     private List<Long> virtualMachineIds;
 
+    @Parameter(name=ApiConstants.VM_IPADDR, type=CommandType.LIST, collectionType=CommandType.STRING, required=false, description="the list of private IPs of the virtual machine that are being assigned to the load balancer rule(i.e. vmips=10.x.x.x,10.x.x.x)")
+    private List<String> vmPrivateIps;
+    
+
     /////////////////////////////////////////////////////
     /////////////////// Accessors ///////////////////////
     /////////////////////////////////////////////////////
@@ -66,7 +71,10 @@ public class AssignToLoadBalancerRuleCmd extends BaseAsyncCmd {
     public List<Long> getVirtualMachineIds() {
         return virtualMachineIds;
     }
-
+ 
+    public List<String> getVmPrivateIps() {
+        return vmPrivateIps;
+    }
     /////////////////////////////////////////////////////
     /////////////// API Implementation///////////////////
     /////////////////////////////////////////////////////
@@ -98,7 +106,21 @@ public class AssignToLoadBalancerRuleCmd extends BaseAsyncCmd {
     @Override
     public void execute(){
         UserContext.current().setEventDetails("Load balancer Id: "+getLoadBalancerId()+" VmIds: "+StringUtils.join(getVirtualMachineIds(), ","));
-        boolean result = _lbService.assignToLoadBalancer(getLoadBalancerId(), virtualMachineIds);
+
+        if (vmPrivateIps != null) {
+            if (virtualMachineIds.size() != vmPrivateIps.size()) {
+                throw new InvalidParameterValueException("Virtual machine ips list size not equal to the number of vms");
+            }
+
+            for (String vmIp: vmPrivateIps) {
+                // validate the ip addresses
+                if (!NetUtils.isValidIp(vmIp)) {
+                    throw new InvalidParameterValueException("invalid ip addreses configured " + vmIp );
+                }
+            }
+        }
+
+        boolean result = _lbService.assignToLoadBalancer(getLoadBalancerId(), virtualMachineIds, vmPrivateIps);
         if (result) {
             SuccessResponse response = new SuccessResponse(getCommandName());
             this.setResponseObject(response);

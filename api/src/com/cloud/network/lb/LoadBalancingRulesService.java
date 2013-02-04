@@ -65,7 +65,7 @@ public interface LoadBalancingRulesService {
     /**
      * Assign a virtual machine, or list of virtual machines, to a load balancer.
      */
-    boolean assignToLoadBalancer(long lbRuleId, List<Long> vmIds);
+    boolean assignToLoadBalancer(long lbRuleId, List<Long> vmIds, List<String> vmPrivateIps);
 
     boolean removeFromLoadBalancer(long lbRuleId, List<Long> vmIds);
 

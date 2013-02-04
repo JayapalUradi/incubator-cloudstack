@@ -14,20 +14,21 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
-package com.cloud.network.dao;
+package com.cloud.vm;
 
-import java.util.List;
+import org.apache.cloudstack.acl.ControlledEntity;
 
-import com.cloud.network.LoadBalancerVMMapVO;
-import com.cloud.utils.db.GenericDao;
 
-public interface LoadBalancerVMMapDao extends GenericDao<LoadBalancerVMMapVO, Long> {
-    void remove(long loadBalancerId);
-    void remove(long loadBalancerId, List<Long> instanceIds, Boolean pending);
-    List<LoadBalancerVMMapVO> listByInstanceId(long instanceId);
-    List<LoadBalancerVMMapVO> listByLoadBalancerId(long loadBalancerId);
-    List<LoadBalancerVMMapVO> listByLoadBalancerId(long loadBalancerId, boolean revoke);
-    LoadBalancerVMMapVO findByLoadBalancerIdAndVmId(long loadBalancerId, long instanceId);
-    boolean isVmAttachedToLoadBalancer(long loadBalancerId);
-    List<LoadBalancerVMMapVO> listByIpAddress(String ipAddress);
+/**
+ * Nic represents one nic on the VM.
+ */
+public interface NicSecondaryIp  extends ControlledEntity  {
+    /**
+     * @return id in the CloudStack database
+     */
+    long getId();
+    long getNicId();
+    String getIp4Address();
+    long getNetworkId();
+    long getVmId();
 }

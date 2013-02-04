@@ -224,6 +224,7 @@ import com.cloud.vm.dao.DomainRouterDaoImpl;
 import com.cloud.vm.dao.InstanceGroupDaoImpl;
 import com.cloud.vm.dao.InstanceGroupVMMapDaoImpl;
 import com.cloud.vm.dao.NicDaoImpl;
+import com.cloud.vm.dao.NicSecondaryIpDaoImpl;
 import com.cloud.vm.dao.SecondaryStorageVmDaoImpl;
 import com.cloud.vm.dao.UserVmDaoImpl;
 import com.cloud.vm.dao.UserVmDetailsDaoImpl;
@@ -326,6 +327,7 @@ public class DefaultComponentLibrary extends ComponentLibraryBase implements Com
         addDao("NetworkConfigurationDao", NetworkDaoImpl.class);
         addDao("NetworkOfferingDao", NetworkOfferingDaoImpl.class);
         addDao("NicDao", NicDaoImpl.class);
+        addDao("NicSecondaryIpDao", NicSecondaryIpDaoImpl.class);
         addDao("InstanceGroupDao", InstanceGroupDaoImpl.class);
         addDao("InstanceGroupJoinDao", InstanceGroupJoinDaoImpl.class);
         addDao("InstanceGroupVMMapDao", InstanceGroupVMMapDaoImpl.class);

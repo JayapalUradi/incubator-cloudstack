@@ -224,7 +224,6 @@ public class ApiConstants {
     public static final String NETWORK_OFFERING_ID = "networkofferingid";
     public static final String NETWORK_IDS = "networkids";
     public static final String NETWORK_ID = "networkid";
-    public static final String NIC_ID = "nicid";
     public static final String SPECIFY_VLAN = "specifyvlan";
     public static final String IS_DEFAULT = "isdefault";
     public static final String IS_SYSTEM = "issystem";
@@ -429,6 +428,9 @@ public class ApiConstants {
     public static final String COUNTERPARAM_LIST = "counterparam";
     public static final String AUTOSCALE_USER_ID = "autoscaleuserid";
     public static final String BAREMETAL_DISCOVER_NAME = "baremetaldiscovername";
+    public static final String NIC_ID = "nicid";
+    public static final String VM_IPADDR = "vmip";
+
 
     public enum HostDetails {
         all, capacity, events, stats, min;

@@ -102,14 +102,14 @@ import com.cloud.network.lb.LoadBalancingRule.LbDestination;
 import com.cloud.network.lb.LoadBalancingRule.LbStickinessPolicy;
 import com.cloud.network.rules.FirewallManager;
 import com.cloud.network.rules.FirewallRule;
-import com.cloud.network.rules.FirewallRule.FirewallRuleType;
-import com.cloud.network.rules.FirewallRule.Purpose;
 import com.cloud.network.rules.FirewallRuleVO;
 import com.cloud.network.rules.LbStickinessMethod;
-import com.cloud.network.rules.LbStickinessMethod.LbStickinessMethodParam;
 import com.cloud.network.rules.LoadBalancer;
 import com.cloud.network.rules.RulesManager;
 import com.cloud.network.rules.StickinessPolicy;
+import com.cloud.network.rules.FirewallRule.FirewallRuleType;
+import com.cloud.network.rules.FirewallRule.Purpose;
+import com.cloud.network.rules.LbStickinessMethod.LbStickinessMethodParam;
 import com.cloud.network.vpc.VpcManager;
 import com.cloud.offering.NetworkOffering;
 import com.cloud.projects.Project.ListProjectResourcesCriteria;
@@ -140,9 +140,12 @@ import com.cloud.utils.db.Transaction;
 import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.utils.net.NetUtils;
 import com.cloud.vm.Nic;
+import com.cloud.vm.NicVO;
 import com.cloud.vm.UserVmVO;
 import com.cloud.vm.VirtualMachine.State;
 import com.cloud.vm.dao.NicDao;
+import com.cloud.vm.dao.NicSecondaryIpDao;
+import com.cloud.vm.dao.NicSecondaryIpVO;
 import com.cloud.vm.dao.UserVmDao;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -230,6 +233,9 @@ public class LoadBalancingRulesManagerImpl<Type> implements LoadBalancingRulesMa
     UserDao _userDao;
     @Inject(adapter = LoadBalancingServiceProvider.class)
     Adapters<LoadBalancingServiceProvider> _lbProviders;
+    @Inject
+    NicSecondaryIpDao _nicSecondaryIpDao;
+
 
     // Will return a string. For LB Stickiness this will be a json, for autoscale this will be "," separated values
     @Override
@@ -610,7 +616,7 @@ public class LoadBalancingRulesManagerImpl<Type> implements LoadBalancingRulesMa
     @Override
     @DB
     @ActionEvent(eventType = EventTypes.EVENT_ASSIGN_TO_LOAD_BALANCER_RULE, eventDescription = "assigning to load balancer", async = true)
-    public boolean assignToLoadBalancer(long loadBalancerId, List<Long> instanceIds) {
+    public boolean assignToLoadBalancer(long loadBalancerId, List<Long> instanceIds,  List<String> vmPrivateIps) {
         UserContext ctx = UserContext.current();
         Account caller = ctx.getCaller();
 
@@ -619,18 +625,40 @@ public class LoadBalancingRulesManagerImpl<Type> implements LoadBalancingRulesMa
             throw new InvalidParameterValueException("Failed to assign to load balancer " + loadBalancerId + ", the load balancer was not found.");
         }
 
+        long networkId = loadBalancer.getNetworkId();
+
+        List<Long> vmIds = null;
+        int i = 0;
+        if (vmPrivateIps != null) {
+            for (String vmIp: vmPrivateIps) {
+                //get the vm id for the corresponding private ip
+                Long vmId = instanceIds.get(i);
+                i++;
+                NicVO nic = _nicDao.findByIp4AddressAndNetworkIdAndInstanceId(networkId, vmId, vmIp);
+                if (nic == null) {
+                    // is it a secondary ip check it
+                    NicSecondaryIpVO nicSecondaryIp = _nicSecondaryIpDao.findByIp4AddressAndNetworkIdAndInstanceId(networkId, vmId, vmIp);
+                    if (nicSecondaryIp == null) {
+                        throw new InvalidParameterValueException("Failed to get the vm for the ip " + vmIp);
+                    }
+                }
+            }
+        }
+
         List<LoadBalancerVMMapVO> mappedInstances = _lb2VmMapDao.listByLoadBalancerId(loadBalancerId, false);
-        Set<Long> mappedInstanceIds = new HashSet<Long>();
+        Set<String> mappedInstanceIps = new HashSet<String>();
         for (LoadBalancerVMMapVO mappedInstance : mappedInstances) {
-            mappedInstanceIds.add(Long.valueOf(mappedInstance.getInstanceId()));
+            mappedInstanceIps.add(mappedInstance.getVmIp());
         }
 
         List<UserVm> vmsToAdd = new ArrayList<UserVm>();
+        List<String> vmPrimaryIps = new ArrayList<String>();
 
+        
         for (Long instanceId : instanceIds) {
-            if (mappedInstanceIds.contains(instanceId)) {
-                throw new InvalidParameterValueException("VM " + instanceId + " is already mapped to load balancer.");
-            }
+//            if (mappedInstanceIps.contains(instanceId)) {
+//                throw new InvalidParameterValueException("VM " + instanceId + " is already mapped to load balancer.");
+//            }
 
             UserVm vm = _vmDao.findById(instanceId);
             if (vm == null || vm.getState() == State.Destroyed || vm.getState() == State.Expunging) {
@@ -660,6 +688,9 @@ public class LoadBalancingRulesManagerImpl<Type> implements LoadBalancingRulesMa
                 ex.addProxyObject(vm, instanceId, "instanceId");
                 throw ex;
             }
+            if (vmPrivateIps == null) {
+                vmPrimaryIps.add(nicInSameNetwork.getIp4Address());
+            }
 
             if (s_logger.isDebugEnabled()) {
                 s_logger.debug("Adding " + vm + " to the load balancer pool");
@@ -667,10 +698,22 @@ public class LoadBalancingRulesManagerImpl<Type> implements LoadBalancingRulesMa
             vmsToAdd.add(vm);
         }
 
+        if (vmPrivateIps == null) {
+            vmPrivateIps = vmPrimaryIps;
+        }
+
+        // check the vm is alreday mapped with or not
+        for (String vmPrivateIp : vmPrivateIps) {
+            if (mappedInstanceIps.contains(vmPrivateIp)) {
+                throw new InvalidParameterValueException("VM " + vmPrivateIp + " is already mapped to load balancer.");
+            }
+        }
+
         Transaction txn = Transaction.currentTxn();
         txn.start();
+        i = 0;
         for (UserVm vm : vmsToAdd) {
-            LoadBalancerVMMapVO map = new LoadBalancerVMMapVO(loadBalancer.getId(), vm.getId(), false);
+            LoadBalancerVMMapVO map = new LoadBalancerVMMapVO(loadBalancer.getId(), vm.getId(), vmPrivateIps.get(i++), false);
             map = _lb2VmMapDao.persist(map);
         }
         txn.commit();
@@ -1317,7 +1360,7 @@ public class LoadBalancingRulesManagerImpl<Type> implements LoadBalancingRulesMa
         for (LoadBalancerVMMapVO lbVmMap : lbVmMaps) {
             UserVm vm = _vmDao.findById(lbVmMap.getInstanceId());
             Nic nic = _nicDao.findByInstanceIdAndNetworkIdIncludingRemoved(lb.getNetworkId(), vm.getId());
-            dstIp = nic.getIp4Address();
+            dstIp = lbVmMap.getVmIp();
             LbDestination lbDst = new LbDestination(lb.getDefaultPortStart(), lb.getDefaultPortEnd(), dstIp, lbVmMap.isRevoke());
             dstList.add(lbDst);
         }

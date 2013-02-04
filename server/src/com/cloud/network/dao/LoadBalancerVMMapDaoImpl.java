@@ -58,6 +58,14 @@ public class LoadBalancerVMMapDaoImpl extends GenericDaoBase<LoadBalancerVMMapVO
     }
 
     @Override
+    public List<LoadBalancerVMMapVO> listByIpAddress(String ipAddress) {
+        SearchCriteria<LoadBalancerVMMapVO> sc = createSearchCriteria();
+        sc.addAnd("ipaddress", SearchCriteria.Op.EQ, ipAddress);
+
+        return listBy(sc);
+    }
+
+    @Override
     public List<LoadBalancerVMMapVO> listByLoadBalancerId(long loadBalancerId) {
         SearchCriteria<LoadBalancerVMMapVO> sc = createSearchCriteria();
         sc.addAnd("loadBalancerId", SearchCriteria.Op.EQ, loadBalancerId);

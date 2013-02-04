@@ -61,6 +61,8 @@ import com.cloud.api.query.vo.UserAccountJoinVO;
 import com.cloud.api.query.vo.UserVmJoinVO;
 import com.cloud.api.query.vo.VolumeJoinVO;
 import com.cloud.api.response.ApiResponseSerializer;
+
+import org.apache.cloudstack.api.response.AddIpToVmNicResponse;
 import org.apache.cloudstack.api.response.AsyncJobResponse;
 import org.apache.cloudstack.api.response.AutoScalePolicyResponse;
 import org.apache.cloudstack.api.response.AutoScaleVmGroupResponse;
@@ -90,6 +92,7 @@ import org.apache.cloudstack.api.response.IpForwardingRuleResponse;
 import org.apache.cloudstack.api.response.LBStickinessPolicyResponse;
 import org.apache.cloudstack.api.response.LBStickinessResponse;
 import org.apache.cloudstack.api.response.LDAPConfigResponse;
+import org.apache.cloudstack.api.response.ListNicSecondaryIpResponse;
 import org.apache.cloudstack.api.response.LoadBalancerResponse;
 import org.apache.cloudstack.api.response.NetworkACLResponse;
 import org.apache.cloudstack.api.response.NetworkOfferingResponse;
@@ -240,6 +243,7 @@ import com.cloud.utils.net.NetUtils;
 import com.cloud.vm.ConsoleProxyVO;
 import com.cloud.vm.InstanceGroup;
 import com.cloud.vm.NicProfile;
+import com.cloud.vm.NicSecondaryIp;
 import com.cloud.vm.VirtualMachine;
 import com.cloud.vm.VirtualMachine.Type;
 
@@ -3139,6 +3143,21 @@ public class ApiResponseHelper implements ResponseGenerator {
         response.setScheduled(snapshotSchedule.getScheduledTimestamp());
 
         response.setObjectName("snapshot");
+        return response;
+    }
+    public AddIpToVmNicResponse createSecondaryIPToNicResponse(String ipAddr, Long nicId, Long networkId) {
+        AddIpToVmNicResponse response = new AddIpToVmNicResponse();
+        response.setIpAddr(ipAddr);
+        response.setNicId(nicId);
+        response.setNwId(networkId);
+        return response;
+    }
+
+    public ListNicSecondaryIpResponse createListNicSecondaryIpResponse(NicSecondaryIp result) {
+        ListNicSecondaryIpResponse response = new ListNicSecondaryIpResponse();
+        response.setid(result.getId());
+        response.setIpAddr(result.getIp4Address());
+        response.setVmId(result.getVmId());
         return response;
     }
 

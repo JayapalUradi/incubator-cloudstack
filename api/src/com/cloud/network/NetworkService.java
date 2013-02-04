@@ -22,6 +22,8 @@ import org.apache.cloudstack.api.command.admin.usage.ListTrafficTypeImplementors
 import org.apache.cloudstack.api.command.user.network.RestartNetworkCmd;
 import org.apache.cloudstack.api.command.user.network.CreateNetworkCmd;
 import org.apache.cloudstack.api.command.user.network.ListNetworksCmd;
+import org.apache.cloudstack.api.command.user.vm.ListSecondaryIPToNicCmd;
+
 import com.cloud.exception.ConcurrentOperationException;
 import com.cloud.exception.InsufficientAddressCapacityException;
 import com.cloud.exception.InsufficientCapacityException;
@@ -32,6 +34,7 @@ import com.cloud.network.Networks.TrafficType;
 import com.cloud.user.Account;
 import com.cloud.user.User;
 import com.cloud.utils.Pair;
+import com.cloud.vm.NicSecondaryIp;
 
 /**
  * The NetworkService interface is the "public" api to entities that make requests to the orchestration engine
@@ -154,5 +157,14 @@ public interface NetworkService {
     Network createPrivateNetwork(String networkName, String displayText, long physicalNetworkId, String vlan,
             String startIp, String endIP, String gateway, String netmask, long networkOwnerId, Long vpcId)
                     throws ResourceAllocationException, ConcurrentOperationException, InsufficientCapacityException;
- 
+
+    String allocateSecondaryGuestIP(Account account, long zoneId, Long nicId,
+            Long networkId, String ipaddress);
+
+    List<NicSecondaryIp> listSecondaryIps(
+            ListSecondaryIPToNicCmd listSecondaryIPToNicCmd);
+
+    boolean releaseSecondaryIpFromNic(long ipAddressId);
+
+
 }

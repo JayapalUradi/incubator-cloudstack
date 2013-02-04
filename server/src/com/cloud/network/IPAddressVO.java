@@ -109,6 +109,11 @@ public class IPAddressVO implements IpAddress {
     @Column(name="vpc_id")
     private Long vpcId;
 
+
+	@Column(name="dnat_vmip")
+    private String vmIp;
+
+
 	protected IPAddressVO() {
 		this.uuid = UUID.randomUUID().toString();
 	}
@@ -285,8 +290,18 @@ public class IPAddressVO implements IpAddress {
         return vpcId;
     }
 
-	@Override
+    @Override
     public void setVpcId(Long vpcId) {
         this.vpcId = vpcId;
+    }
+
+    @Override
+    public String getVmIp() {
+        return vmIp;
+    }
+
+    @Override
+    public void setVmIp(String vmIp) {
+    	this.vmIp = vmIp;
     }
 }

@@ -37,6 +37,7 @@ import javax.naming.ConfigurationException;
 
 import org.apache.cloudstack.acl.ControlledEntity.ACLType;
 import org.apache.cloudstack.acl.SecurityChecker.AccessType;
+import org.apache.cloudstack.api.command.user.vm.ListSecondaryIPToNicCmd;
 import org.apache.log4j.Logger;
 
 import com.cloud.agent.AgentManager;
@@ -168,6 +169,7 @@ import com.cloud.utils.net.Ip;
 import com.cloud.utils.net.NetUtils;
 import com.cloud.vm.Nic;
 import com.cloud.vm.NicProfile;
+import com.cloud.vm.NicSecondaryIp;
 import com.cloud.vm.NicVO;
 import com.cloud.vm.ReservationContext;
 import com.cloud.vm.ReservationContextImpl;
@@ -178,6 +180,8 @@ import com.cloud.vm.VirtualMachine.Type;
 import com.cloud.vm.VirtualMachineProfile;
 import com.cloud.vm.VirtualMachineProfileImpl;
 import com.cloud.vm.dao.NicDao;
+import com.cloud.vm.dao.NicSecondaryIpDao;
+import com.cloud.vm.dao.NicSecondaryIpVO;
 import com.cloud.vm.dao.UserVmDao;
 import com.cloud.vm.dao.VMInstanceDao;
 
@@ -273,6 +277,8 @@ public class NetworkManagerImpl implements NetworkManager, Manager, Listener {
     NetworkACLManager _networkACLMgr;
     @Inject
     NetworkModel _networkModel;
+    @Inject
+    NicSecondaryIpDao _nicSecondaryIpDao;
 
     ScheduledExecutorService _executor;
 
@@ -1776,6 +1782,14 @@ public class NetworkManagerImpl implements NetworkManager, Manager, Listener {
         guru.deallocate(network, profile, vm);
         _nicDao.remove(nic.getId());
         s_logger.debug("Removed nic id=" + nic.getId());
+        //remove the secondary ip addresses corresponding to to this nic
+        List<NicSecondaryIpVO> secondaryIps = _nicSecondaryIpDao.listByNicId(nic.getId());
+        if (secondaryIps != null) {
+            for (NicSecondaryIpVO ip : secondaryIps) {
+                _nicSecondaryIpDao.remove(ip.getId());
+            }
+            s_logger.debug("Removed nic " + nic.getId() + " secondary ip addreses");
+        }
     }
 
     @Override
@@ -2755,6 +2769,40 @@ public class NetworkManagerImpl implements NetworkManager, Manager, Listener {
 
     Random _rand = new Random(System.currentTimeMillis());
 
+     
+
+
+    public List<NicSecondaryIp> listSecondaryIps(ListSecondaryIPToNicCmd cmd) {
+        Long nicId = cmd.getNicId();
+        Long vmId = cmd.getVmId();
+
+        List result = null;
+        if (nicId != null) {
+            result = _nicSecondaryIpDao.listByNicId(nicId);
+        } else if (vmId != null) {
+            result = _nicSecondaryIpDao.listByNicIdAndVmid(nicId, vmId);
+        }
+        return (List<NicSecondaryIp>)result;
+    }
+
+
+    public String allocateGuestIP(Account ipOwner, boolean isSystem, long zoneId, Long networkId, String requestedIp) 
+    throws InsufficientAddressCapacityException {
+        String ipaddr = null;
+        Account caller = UserContext.current().getCaller();
+        long callerUserId = UserContext.current().getCallerUserId();
+        // check permissions
+        DataCenter zone = _configMgr.getZone(zoneId);
+        Network network = _networksDao.findById(networkId);
+
+        _accountMgr.checkAccess(caller, null, false, network);
+
+        //return acquireGuestIpAddress(network, requestedIp);
+        ipaddr = acquireGuestIpAddress(network, requestedIp);
+        return ipaddr;
+    }
+
+
     @Override
     @DB
     public String acquireGuestIpAddress(Network network, String requestedIp) {
@@ -2765,7 +2813,7 @@ public class NetworkManagerImpl implements NetworkManager, Manager, Listener {
 
         Set<Long> availableIps = _networkModel.getAvailableIps(network, requestedIp);
 
-        if (availableIps.isEmpty()) {
+        if (availableIps == null || availableIps.isEmpty()) {
             return null;
         }
 
@@ -2994,9 +3042,9 @@ public class NetworkManagerImpl implements NetworkManager, Manager, Listener {
                 throw new InvalidParameterValueException("Source ip address of the rule id=" + firewallStaticNatRule.getId() + " is not static nat enabled");
             }
 
-            String dstIp = _networkModel.getIpInNetwork(ip.getAssociatedWithVmId(), firewallStaticNatRule.getNetworkId());
+            //String dstIp = _networkModel.getIpInNetwork(ip.getAssociatedWithVmId(), firewallStaticNatRule.getNetworkId());
             ruleVO.setState(FirewallRule.State.Revoke);
-            staticNatRules.add(new StaticNatRuleImpl(ruleVO, dstIp));
+            staticNatRules.add(new StaticNatRuleImpl(ruleVO, ip.getVmIp()));
         }
 
         try {
@@ -3524,4 +3572,26 @@ public class NetworkManagerImpl implements NetworkManager, Manager, Listener {
         }
         return rules.size();
     }
+
+         @Override
+    public boolean isSecondaryIpSetForNic(long nicId) {
+        NicVO nic = _nicDao.findById(nicId);
+        return nic.getSecondaryIp();
+    }
+
+        @Override
+        public boolean removeVmSecondaryIps(long vmId) {
+           Transaction txn = Transaction.currentTxn();
+           txn.start();
+           List <NicSecondaryIpVO> ipList = _nicSecondaryIpDao.listByVmId(vmId);
+           if (ipList != null) {
+               for (NicSecondaryIpVO ip: ipList) {
+                   _nicSecondaryIpDao.remove(ip.getId());
+               }
+               s_logger.debug("Revoving nic secondary ip entry ...");
+           }
+           txn.commit();
+           return true;
+        }
+
 }

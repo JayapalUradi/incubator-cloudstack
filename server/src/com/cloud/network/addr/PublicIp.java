@@ -206,4 +206,14 @@ public class PublicIp implements PublicIpAddress {
     public void setVpcId(Long vpcId) {
         _addr.setVpcId(vpcId);
     }
+
+	@Override
+    public String getVmIp() {
+    return _addr.getVmIp();
+    }
+
+	@Override
+    public void setVmIp(String vmIp) {
+    _addr.setVmIp(vmIp);
+}
 }

@@ -144,4 +144,5 @@ public interface Nic extends Identity, InternalIdentity {
     VirtualMachine.Type getVmType();
 
     AddressFormat getAddressFormat();
+    public boolean getSecondaryIp();
 }
