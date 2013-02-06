@@ -196,6 +196,7 @@ DROP TABLE IF EXISTS `cloud`.`vm_network_map`;
 DROP TABLE IF EXISTS `cloud`.`netapp_volume`;
 DROP TABLE IF EXISTS `cloud`.`netapp_pool`;
 DROP TABLE IF EXISTS `cloud`.`netapp_lun`;
+DROP TABLE IF EXISTS `cloud`.`nic_secondary_ips`;
 
 CREATE TABLE `cloud`.`version` (
   `id` bigint unsigned NOT NULL UNIQUE AUTO_INCREMENT COMMENT 'id',
@@ -318,6 +319,7 @@ CREATE TABLE `cloud`.`nics` (
   `vm_type` varchar(32) COMMENT 'type of vm: System or User vm',
   `created` datetime NOT NULL COMMENT 'date created',
   `removed` datetime COMMENT 'date removed if not null',
+  `secondary_ip` tinyint DEFAULT 0 COMMENT '1: set, 0: not',
   PRIMARY KEY (`id`),
   CONSTRAINT `fk_nics__instance_id` FOREIGN KEY `fk_nics__instance_id`(`instance_id`) REFERENCES `vm_instance`(`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_nics__networks_id` FOREIGN KEY `fk_nics__networks_id`(`network_id`) REFERENCES `networks`(`id`),
@@ -997,6 +999,7 @@ CREATE TABLE  `cloud`.`user_ip_address` (
   `physical_network_id` bigint unsigned NOT NULL COMMENT 'physical network id that this configuration is based on',
   `is_system` int(1) unsigned NOT NULL default '0',
   `vpc_id` bigint unsigned COMMENT 'vpc the ip address is associated with',
+  `dnat_vmip` char(40) COMMENT 'vm private ip address to which static nat is set',  
   PRIMARY KEY (`id`),
   UNIQUE (`public_ip_address`, `source_network_id`),
   CONSTRAINT `fk_user_ip_address__source_network_id` FOREIGN KEY (`source_network_id`) REFERENCES `networks`(`id`),
@@ -2652,4 +2655,21 @@ CREATE TABLE  `cloud`.`user_ipv6_address` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 SET foreign_key_checks = 1;
+
+CREATE TABLE nic_secondary_ips (
+  `id` bigint unsigned NOT NULL UNIQUE AUTO_INCREMENT,
+  `uuid` varchar(40), 
+  `vmId` bigint unsigned COMMENT 'vm instance id',
+  `nicId` bigint unsigned NOT NULL,
+  `ip4_address` char(40) COMMENT 'ip4 address', 
+  `ip6_address` char(40) COMMENT 'ip6 address', 
+  `network_id` bigint unsigned NOT NULL COMMENT 'network configuration id', 
+  `created` datetime NOT NULL COMMENT 'date created', 
+  `account_id` bigint unsigned NOT NULL COMMENT 'owner.  foreign key to   account table', 
+  `domain_id` bigint unsigned NOT NULL COMMENT 'the domain that the owner belongs to',
+   PRIMARY KEY (`id`), 
+   CONSTRAINT `fk_nic_secondary_ip__vmId` FOREIGN KEY `fk_nic_secondary_ip__vmId`(`vmId`) REFERENCES `vm_instance`(`id`) ON DELETE CASCADE, 
+   CONSTRAINT `fk_nic_secondary_ip__networks_id` FOREIGN KEY `fk_nic_secondary_ip__networks_id`(`network_id`) REFERENCES `networks`(`id`),
+   CONSTRAINT `uc_nic_secondary_ip__uuid` UNIQUE (`uuid`) 
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 

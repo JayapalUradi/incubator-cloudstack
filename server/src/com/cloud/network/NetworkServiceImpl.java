@@ -37,12 +37,16 @@ import javax.inject.Inject;
 import javax.naming.ConfigurationException;
 
 import org.apache.cloudstack.acl.ControlledEntity.ACLType;
+import org.apache.cloudstack.acl.SecurityChecker.AccessType;
 import org.apache.cloudstack.api.command.admin.usage.ListTrafficTypeImplementorsCmd;
 import org.apache.cloudstack.api.command.user.network.CreateNetworkCmd;
 import org.apache.cloudstack.api.command.user.network.ListNetworksCmd;
 import org.apache.cloudstack.api.command.user.network.RestartNetworkCmd;
 import org.apache.log4j.Logger;
 import org.springframework.stereotype.Component;
+import org.apache.cloudstack.api.command.user.vm.ListNicsCmd;
+import org.apache.cloudstack.api.command.user.vm.ListSecondaryIPToNicCmd;
+import org.bouncycastle.util.IPAddress;
 
 import com.cloud.configuration.Config;
 import com.cloud.configuration.ConfigurationManager;
@@ -81,7 +85,9 @@ import com.cloud.network.element.VirtualRouterElement;
 import com.cloud.network.element.VpcVirtualRouterElement;
 import com.cloud.network.guru.NetworkGuru;
 import com.cloud.network.rules.FirewallRule.Purpose;
+import com.cloud.network.rules.dao.PortForwardingRulesDao;
 import com.cloud.network.rules.FirewallRuleVO;
+import com.cloud.network.rules.PortForwardingRuleVO;
 import com.cloud.network.rules.RulesManager;
 import com.cloud.network.vpc.PrivateIpVO;
 import com.cloud.network.vpc.VpcManager;
@@ -111,6 +117,8 @@ import com.cloud.utils.exception.CloudRuntimeException;
 import com.cloud.utils.net.NetUtils;
 import com.cloud.vm.*;
 import com.cloud.vm.dao.NicDao;
+import com.cloud.vm.dao.NicSecondaryIpDao;
+import com.cloud.vm.dao.NicSecondaryIpVO;
 import com.cloud.vm.dao.UserVmDao;
 import com.cloud.vm.dao.VMInstanceDao;
 import java.util.*;
@@ -201,6 +209,12 @@ public class NetworkServiceImpl extends ManagerBase implements  NetworkService {
     NetworkManager _networkMgr;
     @Inject
     NetworkModel _networkModel;
+
+    @Inject
+    NicSecondaryIpDao _nicSecondaryIpDao;
+
+    @Inject
+    PortForwardingRulesDao _portForwardingDao;
 
     int _cidrLimit;
     boolean _allowSubdomainNetworkAccess;
@@ -436,6 +450,140 @@ public class NetworkServiceImpl extends ManagerBase implements  NetworkService {
     }
 
 
+    public String allocateSecondaryGuestIP (Account ipOwner, long zoneId, Long nicId, Long networkId, String requestedIp) {
+
+        Long accountId = null;
+        Long domainId = null;
+        Long vmId = null;
+
+        if (networkId != null) {
+            Network network = _networksDao.findById(networkId);
+            accountId = network.getAccountId();
+            domainId = network.getDomainId();
+
+            if (network == null) {
+                throw new InvalidParameterValueException("Invalid network id is given");
+            }
+            //check whether the nic belongs to user vm.
+            NicVO nic = _nicDao.findById(nicId);
+            if (nic.getVmType() != VirtualMachine.Type.User) {
+                throw new InvalidParameterValueException("The nic is not belongs to user vm");
+            }
+
+            if (network.getGuestType() == Network.GuestType.Shared) {
+                DataCenter zone = _configMgr.getZone(zoneId);
+                if (zone == null) {
+                    throw new InvalidParameterValueException("Invalid zone Id is given");
+                }
+
+                // if shared network in the advanced zone, then check the caller against the network for 'AccessType.UseNetwork'
+                if (isSharedNetworkOfferingWithServices(network.getNetworkOfferingId()) && zone.getNetworkType() == NetworkType.Advanced) {
+                    Account caller = UserContext.current().getCaller();
+                    long callerUserId = UserContext.current().getCallerUserId();
+                    _accountMgr.checkAccess(caller, AccessType.UseNetwork, false, network);
+                    if (s_logger.isDebugEnabled()) {
+                        s_logger.debug("Associate IP address called by the user " + callerUserId + " account " + ipOwner.getId());
+                    }
+                    //return allocateIp(ipOwner, false, caller, zone);
+                } else {
+                    throw new InvalidParameterValueException("Associate IP address can only be called on the shared networks in the advanced zone" +
+                    " with Firewall/Source Nat/Static Nat/Port Forwarding/Load balancing services enabled");
+                }
+            }
+        }
+
+        String ipaddr = null;
+        s_logger.debug("Calling the ip allocation ...");
+        try {
+            ipaddr = _networkMgr.allocateGuestIP(ipOwner, false,  zoneId, networkId, requestedIp);
+        } catch (InsufficientAddressCapacityException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+
+        if (ipaddr != null) {
+            // we got the ip addr so up the nics table and secodary ip
+            Transaction txn = Transaction.currentTxn();
+            txn.start();
+            NicVO nic = _nicDao.findById(nicId);
+            boolean nicSecondaryIpSet = nic.getSecondaryIp();
+            if (!nicSecondaryIpSet) {
+                nic.setSecondaryIp(true);
+                // commit when previously set ??
+                s_logger.debug("Setting nics table ...");
+                _nicDao.update(nicId, nic);
+            }
+
+            s_logger.debug("Setting nic_secondary_ip table ...");
+            vmId = nic.getInstanceId();
+            NicSecondaryIpVO secondaryIpVO = new NicSecondaryIpVO(nicId, ipaddr, vmId, accountId, domainId, networkId, null);
+            _nicSecondaryIpDao.persist(secondaryIpVO);
+            txn.commit();
+        }
+        return ipaddr;
+}
+
+    @DB
+    public boolean releaseSecondaryIpFromNic (long ipAddressId) {
+        Long userId = UserContext.current().getCallerUserId();
+        Account caller = UserContext.current().getCaller();
+        boolean success = false;
+
+        // Verify input parameters
+        NicSecondaryIpVO ipVO= _nicSecondaryIpDao.findById(ipAddressId);
+        if (ipVO == null) {
+            throw new InvalidParameterValueException("Unable to find ip address by id");
+        }
+
+        Network network = _networksDao.findById(ipVO.getNetworkId());
+
+        // verify permissions
+        _accountMgr.checkAccess(caller, null, true, network);
+
+        Long nicId = ipVO.getNicId();
+        s_logger.debug("ip id and nic id" + ipAddressId + "..." + nicId);
+        //check is this the last secondary ip for NIC
+        List<NicSecondaryIpVO> ipList = _nicSecondaryIpDao.listByNicId(nicId);
+        boolean lastIp = false;
+        if (ipList.size() == 1) {
+            // this is the last secondary ip to nic
+            lastIp = true;
+        }
+        //check PF or static NAT is configured on this ip address
+        String secondaryIp = ipVO.getIp4Address();
+        List<PortForwardingRuleVO> pfRuleList = _portForwardingDao.listByDestIpAddr(secondaryIp);
+        if (pfRuleList.size() != 0) {
+            s_logger.debug("VM nic IP " + secondaryIp + " is associated with the port forwarding rule");
+            throw new InvalidParameterValueException("Can' remove the secondary ip " + secondaryIp + " is associate with the port forwarding rule");
+        }
+        //check if the secondary ip associated with any static nat rule
+        IPAddressVO publicIpVO = _ipAddressDao.findByVmIp(secondaryIp);
+        if (publicIpVO != null) {
+            s_logger.debug("VM nic IP " + secondaryIp + " is associated with the static NAT rule public IP address id " + publicIpVO.getId());
+            throw new InvalidParameterValueException("Can' remove the ip " + secondaryIp + "is associate with static NAT rule public IP address id " + publicIpVO.getId());
+        }
+        success = removeNicSecondaryIP(ipVO, lastIp);
+        return success;
+    }
+
+    boolean removeNicSecondaryIP(NicSecondaryIpVO ipVO, boolean lastIp) {
+        Transaction txn = Transaction.currentTxn();
+        long nicId = ipVO.getNicId();
+        NicVO nic = _nicDao.findById(nicId);
+
+        txn.start();
+
+        if (lastIp) {
+            nic.setSecondaryIp(false);
+            s_logger.debug("Setting nics secondary ip to false ...");
+            _nicDao.update(nicId, nic);
+        }
+
+        s_logger.debug("Revoving nic secondary ip entry ...");
+        _nicSecondaryIpDao.remove(ipVO.getId());
+        txn.commit();
+        return true;
+    }
 
     @Override
     @DB
@@ -2948,4 +3096,27 @@ public class NetworkServiceImpl extends ManagerBase implements  NetworkService {
        return _networksDao.findByUuid(networkUuid);
     }
 
+    @Override
+    public List<NicSecondaryIp> listSecondaryIps(
+            ListSecondaryIPToNicCmd listSecondaryIPToNicCmd) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public List<? extends Nic> lisNics(ListNicsCmd cmd) {
+        Account caller = UserContext.current().getCaller();
+        Long nicId = cmd.getNicId();
+        Long vmId = cmd.getVmId();
+
+        UserVmVO  userVm = _userVmDao.findById(vmId);
+
+        if (userVm == null) {
+                InvalidParameterValueException ex = new InvalidParameterValueException("Virtual mahine id does not exist");
+                ex.addProxyObject(userVm, vmId, "vmId");
+                throw ex;
+            }
+        _accountMgr.checkAccess(caller, null, true, userVm);
+        return _networkMgr.listVmNics(vmId, nicId);
+    }
 }

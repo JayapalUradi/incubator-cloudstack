@@ -24,6 +24,7 @@ import org.apache.cloudstack.api.ApiConstants.HostDetails;
 import org.apache.cloudstack.api.ApiConstants.VMDetails;
 import org.apache.cloudstack.api.command.user.job.QueryAsyncJobResultCmd;
 import org.apache.cloudstack.api.response.AccountResponse;
+import org.apache.cloudstack.api.response.AddIpToVmNicResponse;
 import org.apache.cloudstack.api.response.AsyncJobResponse;
 import org.apache.cloudstack.api.response.AutoScalePolicyResponse;
 import org.apache.cloudstack.api.response.AutoScaleVmGroupResponse;
@@ -49,6 +50,7 @@ import org.apache.cloudstack.api.response.InstanceGroupResponse;
 import org.apache.cloudstack.api.response.IpForwardingRuleResponse;
 import org.apache.cloudstack.api.response.LBStickinessResponse;
 import org.apache.cloudstack.api.response.LDAPConfigResponse;
+import org.apache.cloudstack.api.response.ListNicSecondaryIpResponse;
 import org.apache.cloudstack.api.response.LoadBalancerResponse;
 import org.apache.cloudstack.api.response.NetworkACLResponse;
 import org.apache.cloudstack.api.response.NetworkOfferingResponse;
@@ -162,6 +164,7 @@ import com.cloud.user.User;
 import com.cloud.user.UserAccount;
 import com.cloud.uservm.UserVm;
 import com.cloud.vm.InstanceGroup;
+import com.cloud.vm.NicSecondaryIp;
 import com.cloud.vm.VirtualMachine;
 
 public interface ResponseGenerator {
@@ -382,4 +385,8 @@ public interface ResponseGenerator {
     UsageRecordResponse createUsageResponse(Usage usageRecord);
 
 	TrafficMonitorResponse createTrafficMonitorResponse(Host trafficMonitor);
+
+    ListNicSecondaryIpResponse createListNicSecondaryIpResponse(NicSecondaryIp r);
+    AddIpToVmNicResponse createSecondaryIPToNicResponse(String ip,
+            Long nicId, Long networkId);
 }
