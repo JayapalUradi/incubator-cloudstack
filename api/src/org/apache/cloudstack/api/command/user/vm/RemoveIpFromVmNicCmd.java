@@ -24,10 +24,10 @@ import org.apache.cloudstack.api.ApiErrorCode;
 import org.apache.cloudstack.api.BaseAsyncCmd;
 import org.apache.cloudstack.api.Parameter;
 import org.apache.cloudstack.api.ServerApiException;
+import org.apache.cloudstack.api.response.ListNicSecondaryIpResponse;
 import org.apache.cloudstack.api.response.SuccessResponse;
 import com.cloud.async.AsyncJob;
 import com.cloud.event.EventTypes;
-import com.cloud.exception.InsufficientAddressCapacityException;
 import com.cloud.exception.InvalidParameterValueException;
 import com.cloud.user.Account;
 import com.cloud.user.UserContext;
@@ -41,7 +41,7 @@ public class RemoveIpFromVmNicCmd extends BaseAsyncCmd {
     //////////////// API parameters /////////////////////
     /////////////////////////////////////////////////////
 
-    @Parameter(name=ApiConstants.ID, type=CommandType.UUID, required = true,
+    @Parameter(name=ApiConstants.ID, type=CommandType.UUID, required = true, entityType = ListNicSecondaryIpResponse.class,
         description="the ID of the secondary ip address to nic")
     private long id;
 

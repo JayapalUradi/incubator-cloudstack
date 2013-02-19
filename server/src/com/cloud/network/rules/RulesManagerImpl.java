@@ -436,7 +436,7 @@ public class RulesManagerImpl extends ManagerBase implements RulesManager, Rules
         boolean performedIpAssoc = false;
         boolean isOneToOneNat = ipAddress.isOneToOneNat();
         Long associatedWithVmId = ipAddress.getAssociatedWithVmId();
-	boolean natForVmSecIp = false;
+	    boolean natForVmSecIp = false;
         Nic guestNic;
         NicSecondaryIpVO nicSecIp = null;
         String dstIp = null;
@@ -545,10 +545,10 @@ public class RulesManagerImpl extends ManagerBase implements RulesManager, Rules
 
             }
         } finally {
-            if (performedIpAssoc) {
-                //if the rule is the last one for the ip address assigned to VPC, unassign it from the network
-                IpAddress ip = _ipAddressDao.findById(ipAddress.getId());
-                _vpcMgr.unassignIPFromVpcNetwork(ip.getId(), networkId);
+                if (performedIpAssoc) {
+                    //if the rule is the last one for the ip address assigned to VPC, unassign it from the network
+                    IpAddress ip = _ipAddressDao.findById(ipAddress.getId());
+                    _vpcMgr.unassignIPFromVpcNetwork(ip.getId(), networkId);
             }
         }
         return false;

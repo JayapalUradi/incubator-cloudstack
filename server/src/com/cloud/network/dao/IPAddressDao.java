@@ -63,7 +63,6 @@ public interface IPAddressDao extends GenericDao<IPAddressVO, Long> {
 	long countFreePublicIPs();
 	
     long countFreeIPsInNetwork(long networkId);
-
     IPAddressVO findByVmIp(String vmIp);
 
     IPAddressVO findByAssociatedVmIdAndVmIp(long vmId, String vmIp);
