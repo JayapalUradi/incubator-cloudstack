@@ -65,7 +65,7 @@ public class AssignToLoadBalancerRuleCmd extends BaseAsyncCmd {
     public List<Long> getVirtualMachineIds() {
         return virtualMachineIds;
     }
-
+ 
     /////////////////////////////////////////////////////
     /////////////// API Implementation///////////////////
     /////////////////////////////////////////////////////

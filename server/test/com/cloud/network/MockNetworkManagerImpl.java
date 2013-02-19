@@ -29,6 +29,8 @@ import org.apache.cloudstack.api.command.user.network.CreateNetworkCmd;
 import org.apache.cloudstack.api.command.user.network.ListNetworksCmd;
 import org.apache.cloudstack.api.command.user.network.RestartNetworkCmd;
 import org.springframework.stereotype.Component;
+import org.apache.cloudstack.api.command.user.vm.ListNicsCmd;
+import org.apache.cloudstack.api.command.user.vm.ListSecondaryIPToNicCmd;
 
 import com.cloud.dc.DataCenter;
 import com.cloud.dc.Vlan.VlanType;
@@ -64,6 +66,7 @@ import com.cloud.utils.component.Manager;
 import com.cloud.utils.component.ManagerBase;
 import com.cloud.vm.Nic;
 import com.cloud.vm.NicProfile;
+import com.cloud.vm.NicSecondaryIp;
 import com.cloud.vm.ReservationContext;
 import com.cloud.vm.VMInstanceVO;
 import com.cloud.vm.VirtualMachine;
@@ -821,6 +824,58 @@ public class MockNetworkManagerImpl extends ManagerBase implements NetworkManage
     @Override
     public IpAddress allocateIP(Account ipOwner, boolean isSystem, long zoneId) throws ResourceAllocationException,
     InsufficientAddressCapacityException, ConcurrentOperationException {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public boolean isSecondaryIpSetForNic(long nicId) {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    @Override
+    public List<NicSecondaryIp> listSecondaryIps(
+            ListSecondaryIPToNicCmd listSecondaryIPToNicCmd) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public boolean releaseSecondaryIpFromNic(long ipAddressId) {
+        // TODO Auto-generated method stub
+        return false;
+    }
+
+    @Override
+    public String allocateSecondaryGuestIP(Account account, long zoneId,
+            Long nicId, Long networkId, String ipaddress) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public String allocateGuestIP(Account ipOwner, boolean isSystem,
+            long zoneId, Long networkId, String requestedIp)
+            throws InsufficientAddressCapacityException {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+	@Override
+    public boolean removeVmSecondaryIps(long vmId) {
+	    // TODO Auto-generated method stub
+	    return false;
+    }
+
+    @Override
+    public List<? extends Nic> listVmNics(Long vmId, Long nicId) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public List<? extends Nic> lisNics(ListNicsCmd listNicsCmd) {
         // TODO Auto-generated method stub
         return null;
     }

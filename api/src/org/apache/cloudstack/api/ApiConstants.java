@@ -443,6 +443,7 @@ public class ApiConstants {
     public static final String VM_SNAPSHOT_ID = "vmsnapshotid";
     public static final String VM_SNAPSHOT_DISK_IDS = "vmsnapshotdiskids";
     public static final String VM_SNAPSHOT_MEMORY = "snapshotmemory";
+    public static final String VM_IPADDR = "vmip";
 
     public enum HostDetails {
         all, capacity, events, stats, min;
